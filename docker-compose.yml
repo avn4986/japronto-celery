@@ -1,0 +1,43 @@
+version: "3"
+networks:
+  internal-network:
+    driver: bridge
+services:
+  #Redis Container
+  redis:
+    container_name: redis_container
+    image: redis
+    networks:
+      - internal-network
+    ports:
+      - 6379:6379
+  #Worker Application
+  workerapp:
+    container_name: worker_container
+    networks:
+      - internal-network
+    volumes:
+      - ./api:/app
+      - ./logs:/logs
+    working_dir: /app
+    build:
+      context: api
+      dockerfile: Dockerfile-worker
+    command: celery -A celery_config worker --loglevel=DEBUG --autoscale=10,3
+    depends_on:
+      - redis
+  #Web Application
+  webapp:
+    container_name: webapp_container
+    networks:
+      - internal-network
+    volumes:
+      - ./api:/app
+    build: ./api
+    working_dir: /app
+    command: python main.py
+    ports:
+      - 4566:8080
+    depends_on:
+      - redis
+      - workerapp
